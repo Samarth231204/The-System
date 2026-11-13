@@ -44,6 +44,7 @@ export default async function DashboardPage() {
           <p className="sys-small sys-muted">Signed in as {user.email}</p>
           <div className="sys-row">
             <Button href="/quests">Quest log</Button>
+            <Button href="/rubric">XP design</Button>
             <Button href="/profile" variant="ghost">Edit profile</Button>
             <LogoutButton />
           </div>
