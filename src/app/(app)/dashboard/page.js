@@ -49,6 +49,7 @@ export default async function DashboardPage() {
           <div className="sys-row">
             <Button href="/quests">Quest log</Button>
             <Button href="/rubric">XP design</Button>
+            <Button href="/targets">Boss targets</Button>
             <Button href="/profile" variant="ghost">Edit profile</Button>
             <LogoutButton />
           </div>
