@@ -2,33 +2,38 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Panel from '@/components/arcade/Panel';
+import { AI_KEY_STORAGE } from '@/components/onboarding/OnboardingFlow';
 
 const KIND_LABEL = { quest: 'Daily quests', side: 'Side quests', note: 'Quick notes' };
 const KIND_HELP = {
-  quest: 'Today\'s main work. Each one can earn XP once the judge is connected.',
-  side: 'Extra work outside the daily plan.',
+  quest: "Today's main work. Each one earns XP when completed.",
+  side: 'Extra work outside the daily plan. Also earns XP.',
   note: 'Quick thoughts and reminders. Notes do not earn XP.',
 };
-
-// Converts a Date to the value a datetime-local input expects, in the player's own time zone.
-function toLocalInput(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function formatDue(iso) {
   if (!iso) return null;
   return new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+function readKey() {
+  try {
+    return localStorage.getItem(AI_KEY_STORAGE) || '';
+  } catch {
+    return '';
+  }
+}
+
 export default function QuestBoard() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [provider, setProvider] = useState('gemini');
   const [draft, setDraft] = useState({ kind: 'quest', title: '', details: '', due: '' });
   const [now, setNow] = useState(() => Date.now());
+  const [openJudge, setOpenJudge] = useState(null);
+  const [overrides, setOverrides] = useState({});
 
   const load = useCallback(async () => {
     const res = await fetch('/api/tasks', { cache: 'no-store' });
@@ -40,6 +45,10 @@ export default function QuestBoard() {
 
   useEffect(() => {
     load();
+    fetch('/api/player', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => d.player?.provider && setProvider(d.player.provider))
+      .catch(() => {});
     const t = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(t);
   }, [load]);
@@ -61,12 +70,32 @@ export default function QuestBoard() {
     setDraft((d) => ({ ...d, title: '', details: '', due: '' }));
   }
 
+  async function complete(id) {
+    setError('');
+    setNotice('The judge is reading your work…');
+    const res = await fetch(`/api/tasks/${id}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: readKey(), provider }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setNotice('');
+      return setError(data.error || 'Could not complete quest.');
+    }
+    setTasks((list) => list.map((t) => (t.id === id ? data.task : t)));
+    setOpenJudge(id);
+    setNotice(`+${data.task.xpTotal} XP${data.note ? ` · ${data.note}` : ''}`);
+  }
+
   async function patch(id, fields) {
     setError('');
     const res = await fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return setError(data.error || 'Could not update quest.');
     setTasks((list) => list.map((t) => (t.id === id ? data.task : t)));
+    setOpenJudge(null);
+    setNotice(fields.status === 'open' ? 'Quest reopened. Its XP was taken back.' : '');
   }
 
   async function remove(id) {
@@ -77,13 +106,28 @@ export default function QuestBoard() {
     setTasks((list) => list.filter((t) => t.id !== id));
   }
 
+  function openOverride(task) {
+    setOverrides(Object.fromEntries(task.judgement.map((j) => [j.key, { score: j.score, reason: j.reason }])));
+    setOpenJudge(openJudge === task.id ? null : task.id);
+  }
+
+  async function saveOverride(task) {
+    setError('');
+    const scores = task.judgement.map((j) => ({ key: j.key, score: Number(overrides[j.key]?.score ?? j.score), reason: overrides[j.key]?.reason ?? j.reason }));
+    const res = await fetch(`/api/tasks/${task.id}/judgement`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scores }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return setError(data.error || 'Could not save the judgement.');
+    setTasks((list) => list.map((t) => (t.id === task.id ? data.task : t)));
+    setNotice(`Judgement saved. Now +${data.task.xpTotal} XP.`);
+  }
+
   const grouped = useMemo(() => {
     const groups = { quest: [], side: [], note: [] };
     for (const t of tasks) if (t.status === 'open') groups[t.kind].push(t);
     return groups;
   }, [tasks]);
 
-  const doneToday = tasks.filter((t) => t.status === 'done');
+  const done = tasks.filter((t) => t.status === 'done');
 
   return (
     <div style={{ display: 'grid', gap: 18 }}>
@@ -103,8 +147,8 @@ export default function QuestBoard() {
             <input id="q-title" className="sys-input" maxLength={140} value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} />
           </div>
           <div className="sys-field">
-            <label className="sys-label" htmlFor="q-details">Details (optional)</label>
-            <textarea id="q-details" className="sys-input" rows={2} maxLength={1000} value={draft.details} onChange={(e) => setDraft((d) => ({ ...d, details: e.target.value }))} />
+            <label className="sys-label" htmlFor="q-details">Details (the judge reads these)</label>
+            <textarea id="q-details" className="sys-input" rows={3} maxLength={1000} value={draft.details} onChange={(e) => setDraft((d) => ({ ...d, details: e.target.value }))} />
           </div>
           {draft.kind !== 'note' && (
             <div className="sys-field">
@@ -119,6 +163,7 @@ export default function QuestBoard() {
       </Panel>
 
       {error && <p role="alert" className="sys-error sys-small">{error}</p>}
+      <div role="status" aria-live="polite" className="sys-small">{notice}</div>
       {loading && <p className="sys-muted">Loading the quest log…</p>}
 
       {['quest', 'side', 'note'].map((kind) => (
@@ -136,7 +181,7 @@ export default function QuestBoard() {
                     {t.dueAt && <div className="sys-small" style={{ color: overdue ? '#ff6b8a' : undefined }}>{overdue ? 'Overdue · ' : 'Due · '}{formatDue(t.dueAt)}</div>}
                   </div>
                   <div className="sys-row">
-                    {kind !== 'note' && <button className="sys-btn" onClick={() => patch(t.id, { status: 'done' })}>Complete</button>}
+                    {kind !== 'note' && <button className="sys-btn" onClick={() => complete(t.id)}>Complete</button>}
                     <button className="sys-btn sys-btn--ghost" onClick={() => remove(t.id)}>Delete</button>
                   </div>
                 </li>
@@ -147,15 +192,43 @@ export default function QuestBoard() {
       ))}
 
       <Panel>
-        <h2 className="sys-h2">Completed in the last 24 hours <span className="sys-small sys-muted">({doneToday.length})</span></h2>
-        {doneToday.length === 0 && <p className="sys-muted sys-small">Nothing completed yet today.</p>}
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-          {doneToday.map((t) => (
-            <li key={t.id} className="sys-row" style={{ justifyContent: 'space-between', opacity: 0.7 }}>
-              <span><s>{t.title}</s> <span className="sys-small sys-muted">· {KIND_LABEL[t.kind]}</span></span>
-              <span className="sys-row">
-                <button className="sys-btn sys-btn--ghost" onClick={() => patch(t.id, { status: 'open' })}>Reopen</button>
-              </span>
+        <h2 className="sys-h2">Completed <span className="sys-small sys-muted">({done.length} in the last 24 hours)</span></h2>
+        {done.length === 0 && <p className="sys-muted sys-small">Nothing completed yet today.</p>}
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
+          {done.map((t) => (
+            <li key={t.id} style={{ display: 'grid', gap: 8, padding: 10, border: '1px solid var(--line)', background: 'var(--deep)' }}>
+              <div className="sys-row" style={{ justifyContent: 'space-between' }}>
+                <span><s>{t.title}</s> <span className="sys-small sys-muted">· {KIND_LABEL[t.kind]}</span></span>
+                <span className="sys-row">
+                  {t.kind !== 'note' && <span className="sys-xp">+{t.xpTotal} XP</span>}
+                  {t.kind !== 'note' && t.judgement.length > 0 && <button className="sys-btn sys-btn--ghost" onClick={() => openOverride(t)}>{openJudge === t.id ? 'Hide judgement' : 'Judgement'}</button>}
+                  <button className="sys-btn sys-btn--ghost" onClick={() => patch(t.id, { status: 'open' })}>Reopen</button>
+                </span>
+              </div>
+              {openJudge === t.id && t.judgement.length > 0 && (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <div className="sys-small sys-muted">Judged by {t.judgedBy === 'ai' ? 'your AI engine' : t.judgedBy === 'override' ? 'you (overridden)' : 'this device'}.</div>
+                  {t.judgement.map((j) => (
+                    <div key={j.key} className="sys-row" style={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                        <div><strong>{j.label}</strong> · weight {j.weight} · <span className="sys-xp">+{j.amount} XP</span></div>
+                        <div className="sys-small sys-muted">{j.reason}</div>
+                      </div>
+                      <div className="sys-row" style={{ alignItems: 'flex-end' }}>
+                        <div className="sys-field" style={{ width: 84 }}>
+                          <label className="sys-label" htmlFor={`s-${t.id}-${j.key}`}>Score 0–10</label>
+                          <input id={`s-${t.id}-${j.key}`} className="sys-input" type="number" min={0} max={10} value={overrides[j.key]?.score ?? j.score} onChange={(e) => setOverrides((o) => ({ ...o, [j.key]: { ...o[j.key], score: e.target.value } }))} />
+                        </div>
+                        <div className="sys-field" style={{ width: 200 }}>
+                          <label className="sys-label" htmlFor={`r-${t.id}-${j.key}`}>Reason</label>
+                          <input id={`r-${t.id}-${j.key}`} className="sys-input" maxLength={240} value={overrides[j.key]?.reason ?? j.reason} onChange={(e) => setOverrides((o) => ({ ...o, [j.key]: { ...o[j.key], reason: e.target.value } }))} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="sys-row"><button className="sys-btn sys-btn--primary" onClick={() => saveOverride(t)}>Save judgement</button></div>
+                </div>
+              )}
             </li>
           ))}
         </ul>

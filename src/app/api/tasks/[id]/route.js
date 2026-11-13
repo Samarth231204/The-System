@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import { Task } from '@/lib/db/models/Task';
 import { toTaskDto, parseTaskInput } from '@/lib/tasks/service';
 import { serverError } from '@/lib/auth/service';
+import { clearJudgement } from '@/lib/judge/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +21,11 @@ export async function PATCH(request, { params }) {
 
   try {
     await connectToDatabase();
-    const task = await Task.findOneAndUpdate({ _id: id, userId: user.id }, { $set: value }, { new: true, runValidators: true }).lean();
-    if (!task) return Response.json({ error: 'Task not found.' }, { status: 404 });
-    return Response.json({ task: toTaskDto(task) });
+    const doc = await Task.findOneAndUpdate({ _id: id, userId: user.id }, { $set: value }, { new: true, runValidators: true });
+    if (!doc) return Response.json({ error: 'Task not found.' }, { status: 404 });
+    // Reopening a quest takes its XP back.
+    if (value.status === 'open') await clearJudgement(user.id, doc);
+    return Response.json({ task: toTaskDto(doc) });
   } catch (err) {
     return serverError(err);
   }

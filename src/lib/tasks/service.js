@@ -10,6 +10,9 @@ export function toTaskDto(t) {
     dueAt: t.dueAt ? new Date(t.dueAt).toISOString() : null,
     status: t.status,
     completedAt: t.completedAt ? new Date(t.completedAt).toISOString() : null,
+    xpTotal: t.xpTotal || 0,
+    judgedBy: t.judgedBy || null,
+    judgement: (t.judgement || []).map((j) => ({ key: j.key, label: j.label, weight: j.weight, score: j.score, amount: j.amount, reason: j.reason })),
   };
 }
 
