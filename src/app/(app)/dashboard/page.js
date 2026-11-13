@@ -7,6 +7,9 @@ import Button from '@/components/arcade/Button';
 import LogoutButton from '@/components/auth/LogoutButton';
 import AvatarArt from '@/components/avatars/AvatarArt';
 import { getCurrentUser } from '@/lib/auth/current-user';
+import { connectToDatabase } from '@/lib/db/connect';
+import { Task } from '@/lib/db/models/Task';
+import { Target } from '@/lib/db/models/Target';
 import { getPlayer, toPlayerDto } from '@/lib/player/service';
 import { findAvatar } from '@/lib/avatars';
 import { computeStats } from '@/lib/stats/service';
@@ -22,12 +25,18 @@ export default async function DashboardPage() {
   const player = toPlayerDto(await getPlayer(user.id));
   if (!player?.onboarded) redirect('/onboarding');
 
+  await connectToDatabase();
+  const [stats, openQuests, nearest, claimedCount] = await Promise.all([
+    computeStats(user.id),
+    Task.countDocuments({ userId: user.id, status: 'open', kind: { $ne: 'note' } }),
+    Target.findOne({ userId: user.id, claimedAt: null }).sort({ deadline: 1 }).lean(),
+    Target.countDocuments({ userId: user.id, claimedAt: { $ne: null } }),
+  ]);
   const avatar = findAvatar(player.avatarId);
-  const stats = await computeStats(user.id);
 
   return (
     <>
-      <Ticker items={[`Player ${player.playerName} online`, `Class: ${avatar.name}`, 'Quest log online']} />
+      <Ticker items={[`Player ${player.playerName} online`, `Level ${stats.level} ${stats.title}`, `${stats.totalXp} XP`]} />
       <main className="sys-main">
         <header style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div className="sys-eyebrow">Player one // online</div>
@@ -37,23 +46,43 @@ export default async function DashboardPage() {
         <Panel>
           <div className="sys-row" style={{ alignItems: 'center', gap: 16 }}>
             <AvatarArt id={player.avatarId} size={72} title={avatar.name} />
-            <div>
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
               <h2 className="sys-h2">{player.playerName}</h2>
               <div className="sys-small sys-muted">{avatar.title}</div>
               <Link href="/stats" className="sys-xp">Level {stats.level} · {stats.title}</Link>
-              <div className="sys-small"><Link href="/stats">{stats.totalXp} XP</Link></div>
+              <div className="sys-small"><Link href="/stats">{stats.totalXp} XP earned</Link> · <span className="sys-muted">{stats.completedQuests} quests judged</span></div>
             </div>
           </div>
           {player.purpose && <p>{player.purpose}</p>}
-          <p className="sys-small sys-muted">Signed in as {user.email}</p>
-          <div className="sys-row">
-            <Button href="/quests">Quest log</Button>
-            <Button href="/rubric">XP design</Button>
-            <Button href="/targets">Boss targets</Button>
-            <Button href="/profile" variant="ghost">Edit profile</Button>
-            <LogoutButton />
-          </div>
         </Panel>
+
+        <div className="sys-grid">
+          <Panel>
+            <h2 className="sys-h2">Quest log</h2>
+            <p className="sys-small sys-muted">{openQuests === 0 ? 'No open quests. Add today’s work to earn XP.' : `${openQuests} open quest${openQuests === 1 ? '' : 's'} waiting.`}</p>
+            <Button href="/quests">Open quest log</Button>
+          </Panel>
+          <Panel>
+            <h2 className="sys-h2">Boss target</h2>
+            {nearest
+              ? <p className="sys-small">Nearest: <strong>{nearest.title}</strong> · due {new Date(nearest.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</p>
+              : <p className="sys-small sys-muted">No open boss target. Set one to give your XP a purpose.</p>}
+            <p className="sys-small sys-muted">{claimedCount} defeated so far.</p>
+            <Button href="/targets">Boss board</Button>
+          </Panel>
+          <Panel>
+            <h2 className="sys-h2">Tune the system</h2>
+            <p className="sys-small sys-muted">XP parameters, alert timing, AI engine and your details.</p>
+            <div className="sys-row">
+              <Button href="/rubric">XP design</Button>
+              <Button href="/profile" variant="ghost">Profile</Button>
+            </div>
+          </Panel>
+        </div>
+
+        <div className="sys-row">
+          <LogoutButton />
+        </div>
       </main>
     </>
   );
