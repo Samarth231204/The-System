@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The System Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap">
+<style>
+:root{
+  /* layout: arcade strip on top, hero row, stat tiles, two wrapping columns of cut-corner panels over a moving grid floor */
+  --h:258;            /* accent hue, driven by urgency: 258 blue, 305 purple, 385 red */
+  --spd:1;            /* motion speed multiplier, shrinks as urgency rises */
+  --bg:#04050b;
+  --ink:#eef1ff;
+  --muted:#b4b9d6;
+  --accent:oklch(0.78 0.15 var(--h));
+  --line:oklch(0.62 0.24 var(--h));
+  --fill:oklch(0.46 0.2 var(--h));
+  --deep:oklch(0.17 0.07 var(--h));
+  --panel:rgba(4,5,11,.88);
+  --font-display:'Bungee','Chakra Petch',Impact,sans-serif;
+  --font-body:'Chakra Petch','Trebuchet MS',system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:17px;font-weight:500;line-height:1.4;overflow-x:hidden}
+.sky{position:fixed;inset:0;background:linear-gradient(var(--bg) 0%,var(--deep) 60%,oklch(0.24 0.12 var(--h)) 100%);z-index:-3}
+.floor-wrap{position:fixed;left:-50%;right:-50%;bottom:0;height:380px;transform:perspective(380px) rotateX(62deg);transform-origin:bottom;z-index:-2;pointer-events:none;opacity:.7}
+.floor{position:absolute;inset:0;background-image:linear-gradient(var(--line) 2px,transparent 2px),linear-gradient(90deg,var(--line) 2px,transparent 2px);background-size:60px 60px;animation:floor calc(1.2s*var(--spd)) linear infinite}
+.scan{position:fixed;inset:0;background:repeating-linear-gradient(rgba(0,0,0,0) 0 3px,rgba(0,0,0,.25) 3px 4px);pointer-events:none;z-index:-1}
+@keyframes floor{to{background-position:0 60px}}
+@keyframes marquee{to{transform:translateX(-50%)}}
+@keyframes ga{0%,100%{clip-path:inset(0 0 85% 0);transform:translate(-4px,0)}20%{clip-path:inset(30% 0 45% 0);transform:translate(5px,0)}40%{clip-path:inset(62% 0 12% 0);transform:translate(-6px,0)}60%{clip-path:inset(10% 0 70% 0);transform:translate(4px,0)}80%{clip-path:inset(78% 0 4% 0);transform:translate(-3px,0)}}
+@keyframes gb{0%,100%{clip-path:inset(70% 0 8% 0);transform:translate(5px,0)}25%{clip-path:inset(5% 0 80% 0);transform:translate(-5px,0)}50%{clip-path:inset(42% 0 36% 0);transform:translate(6px,0)}75%{clip-path:inset(20% 0 58% 0);transform:translate(-4px,0)}}
+@keyframes stripes{to{background-position:28px 0}}
+@keyframes pop{0%{transform:translateY(14px) skewX(-4deg)}70%{transform:translateY(-3px) skewX(1deg)}100%{transform:none}}
+@keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-2px,1px)}50%{transform:translate(2px,-1px)}75%{transform:translate(-1px,-1px)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 34px 2px var(--line)}}
+@keyframes flicker{0%,18%,22%,25%,53%,57%,100%{opacity:1}20%,24%,55%{opacity:.4}}
+
+.ticker{background:var(--fill);border-bottom:2px solid var(--bg);overflow:hidden}
+.ticker-track{display:flex;gap:48px;width:max-content;padding:9px 0;font-weight:700;font-size:14px;letter-spacing:3px;white-space:nowrap;text-transform:uppercase;animation:marquee calc(22s*var(--spd)) linear infinite}
+main{max-width:1280px;margin:0 auto;padding:24px 20px 80px;display:flex;flex-direction:column;gap:22px}
+h1,h2,h3,p{margin:0}
+h2{font-family:var(--font-display);font-weight:400;font-size:21px;line-height:1.15;text-wrap:balance}
+.eyebrow{font-weight:700;font-size:14px;letter-spacing:6px;color:var(--accent);text-transform:uppercase;animation:flicker 3s linear infinite}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.glitch{position:relative;display:inline-block;font-family:var(--font-display);font-size:clamp(44px,9vw,92px);line-height:1;text-shadow:0 0 30px var(--line)}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;left:0;top:0;width:100%}
+.glitch::before{color:var(--line);animation:ga calc(1.7s*var(--spd)) steps(1) infinite}
+.glitch::after{color:#fff;opacity:.75;animation:gb calc(2.2s*var(--spd)) steps(1) infinite}
+
+.panel{background:var(--panel);border:2px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:12px;clip-path:polygon(20px 0,100% 0,100% calc(100% - 20px),calc(100% - 20px) 100%,0 100%,0 20px);animation:pop .5s cubic-bezier(.2,.9,.3,1.2)}
+.panel.solid{background:var(--fill);border-color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.between{justify-content:space-between}
+.cols{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.col{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.col.wide{flex:1.6 1 420px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:14px}
+
+button,.btn{font:700 15px var(--font-body);letter-spacing:1.5px;text-transform:uppercase;min-height:44px;padding:0 16px;background:var(--bg);color:var(--ink);border:2px solid var(--line);cursor:pointer;clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);transition:transform .12s,background .12s}
+button:hover{transform:translate(-2px,-2px);background:var(--deep)}
+button.primary{background:var(--fill);color:#fff;border-color:var(--accent)}
+button.primary:hover{background:var(--line)}
+button.ghost{border-color:transparent;color:var(--muted);padding:0 10px;clip-path:none}
+button.tick{width:44px;padding:0;flex:none;font-size:18px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #fff;outline-offset:-3px}
+input[type=text],input[type=password],input[type=number],select,textarea{font:500 16px var(--font-body);color:var(--ink);background:#0a0c18;border:2px solid var(--line);padding:10px 12px;min-height:44px;min-width:0;flex:1 1 160px}
+textarea{width:100%;min-height:92px;resize:vertical;flex:none}
+select{flex:0 1 150px}
+label{font-weight:700;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px}
+
+.item{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.item .t{flex:1 1 150px;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.item.done .t{opacity:.55;text-decoration:line-through}
+.chip{font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--line);color:var(--accent);white-space:nowrap}
+.chip.hot{background:var(--fill);color:#fff;border-color:var(--accent)}
+.xp{font-family:var(--font-display);color:var(--accent);white-space:nowrap}
+.bar{height:14px;background:#0a0c18}
+.bar>i{display:block;height:100%;background:repeating-linear-gradient(90deg,var(--line) 0 10px,var(--fill) 10px 14px);background-size:28px 100%;box-shadow:0 0 14px var(--line);animation:stripes calc(.7s*var(--spd)) linear infinite;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.stat-num{font-family:var(--font-display);font-size:22px;color:var(--accent)}
+.avatar{width:84px;height:84px;flex:none;border:2px solid var(--line);background:var(--deep);color:var(--accent);display:grid;place-items:center;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+.avatar svg{width:56px;height:56px}
+.avatars{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:12px}
+.avatars button{height:112px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;color:var(--accent)}
+.avatars button svg{width:48px;height:48px}
+.avatars button[aria-pressed=true]{background:var(--fill);color:#fff;border-color:#fff}
+.banner{background:var(--fill);color:#fff;border:2px solid var(--accent);padding:14px 18px;font-weight:700;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.banner .count{font-family:var(--font-display);font-size:22px}
+.verdict{background:var(--fill);color:#fff;padding:12px 14px;font-weight:600}
+.timeline{position:relative;height:26px;margin:4px 6px 0}
+.timeline::before{content:"";position:absolute;left:0;right:0;top:12px;height:2px;background:var(--line)}
+.timeline span{position:absolute;top:6px;width:14px;height:14px;margin-left:-7px;border:2px solid var(--line);background:var(--bg);transform:rotate(45deg)}
+.timeline span.hit{background:var(--accent)}
+.timeline b{position:absolute;top:0;width:2px;height:26px;background:#fff}
+.steps{display:flex;gap:6px}
+.steps i{height:6px;flex:1;background:#151830}
+.steps i.on{background:var(--accent)}
+.onb{max-width:720px;margin:0 auto;width:100%}
+.rule{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+.rule input[type=number]{flex:0 0 92px}
+details{border:1px dashed var(--line);padding:10px 14px}
+summary{cursor:pointer;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-size:14px}
+ol{margin:8px 0 0;padding-left:20px}
+.empty{color:var(--muted);font-size:15px;padding:6px 0}
+[hidden]{display:none!important}
+body.frantic .banner,body.frantic .glitch{animation:shake calc(.5s*var(--spd)) linear infinite}
+body.frantic .panel{animation:pulse calc(1.6s*var(--spd)) ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true"></div>
+<div class="floor-wrap" aria-hidden="true"><div class="floor"></div></div>
+<div class="scan" aria-hidden="true"></div>
+
+<div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker"></div></div>
+
+<main>
+<!-- ============ ONBOARDING ============ -->
+<section id="onb" class="onb" aria-live="polite">
+  <div class="panel" data-step="0">
+    <div class="eyebrow">Front-end prototype</div>
+    <h1 class="glitch" data-text="THE SYSTEM">THE SYSTEM</h1>
+    <p>Your life as a game. Clear quests, earn XP from an AI judge, and spend it on the targets you care about.</p>
+    <p class="muted small">This is a look-and-feel prototype. Nothing is sent to a server, and the judge is simulated.</p>
+    <div class="row"><button class="primary" data-act="next">Press start</button></div>
+  </div>
+
+  <div class="panel" data-step="1" hidden>
+    <div class="steps" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+    <h2>Name your player</h2>
+    <div class="field"><label for="f-name">Player name</label><input type="text" id="f-name" maxlength="24" autocomplete="off"></div>
+    <p class="small" id="e-name" role="alert" hidden>Enter a player name to continue.</p>
+    <div class="row"><button data-act="back">Back</button><button class="primary" data-act="next">Next</button></div>
+  </div>
+
+  <div class="panel" data-step="2" hidden>
+    <div class="steps" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+    <h2>What is your purpose?</h2>
+    <div class="field"><label for="f-purpose">Purpose (your bio)</label><textarea id="f-purpose" maxlength="160"></textarea></div>
+    <p class="muted small">One or two lines. It shows next to your name on the dashboard.</p>
+    <div class="row"><button data-act="back">Back</button><button class="primary" data-act="next">Next</button></div>
+  </div>
+
+  <div class="panel" data-step="3" hidden>
+    <div class="steps" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+    <h2>Choose your avatar</h2>
+    <div class="avatars" id="avatars" role="group" aria-label="Avatars"></div>
+    <div class="row"><button data-act="back">Back</button><button class="primary" data-act="next">Next</button></div>
+  </div>
+
+  <div class="panel" data-step="4" hidden>
+    <div class="steps" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+    <h2>Connect your judge</h2>
+    <p>The judge is an LLM that runs on your own API key.</p>
+    <div class="row">
+      <div class="field" style="flex:0 1 180px"><label for="f-provider">Provider</label>
+        <select id="f-provider" style="flex:none"><option value="gemini">Gemini</option><option value="claude">Claude</option><option value="openai">OpenAI</option></select></div>
+      <div class="field" style="flex:1 1 260px"><label for="f-key">API key</label><input type="password" id="f-key" autocomplete="off" placeholder="Paste your key"></div>
+    </div>
+    <details><summary>How do I get a key?</summary><ol id="guide"></ol></details>
+    <p class="muted small">Prototype: the key is not checked, sent or saved. You can leave it empty.</p>
+    <div class="row"><button data-act="back">Back</button><button class="primary" data-act="next">Next</button></div>
+  </div>
+
+  <div class="panel" data-step="5" hidden>
+    <div class="steps" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+    <h2>Set your XP rules</h2>
+    <div class="field"><label for="f-goals">Describe your goals</label><textarea id="f-goals" placeholder="Example: I want to earn from freelancing, get fitter and finish my DSA prep."></textarea></div>
+    <div class="row"><button data-act="gen-rubric">Generate XP rules</button><span class="muted small">Simulated here. In the real app the LLM writes these.</span></div>
+    <div id="rubric"></div>
+    <div class="row"><button data-act="add-rule">Add a parameter</button></div>
+    <div class="row"><button data-act="back">Back</button><button class="primary" data-act="finish">Enter The System</button></div>
+  </div>
+</section>
+
+<!-- ============ DASHBOARD ============ -->
+<section id="dash" hidden style="display:flex;flex-direction:column;gap:22px">
+  <div class="banner" id="urgent" role="alert" hidden><span id="urgent-text"></span><span class="count" id="urgent-count"></span></div>
+  <div class="banner" id="stagnant" role="alert" hidden><span>No XP has gone toward a boss target for a while. Pick one and move it forward.</span><button data-act="dismiss-stagnant">Dismiss</button></div>
+
+  <header class="row between" style="align-items:flex-end;gap:20px">
+    <div class="row" style="gap:18px;flex:1 1 420px;min-width:0">
+      <div class="avatar" id="d-avatar"></div>
+      <div style="min-width:0;display:flex;flex-direction:column;gap:2px">
+        <div class="eyebrow">The System // <span id="d-state">All clear</span></div>
+        <div class="glitch" id="d-level" data-text="LEVEL 01">LEVEL 01</div>
+        <div><strong id="d-name"></strong> <span class="muted" id="d-purpose"></span></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end">
+      <div class="xp" style="font-size:36px;line-height:1;text-shadow:0 0 20px var(--line)" id="d-total">0 XP</div>
+      <div class="small muted" id="d-next"></div>
+      <div class="row"><button data-act="edit-player">Edit player</button><button data-act="edit-rules">XP rules</button></div>
+    </div>
+  </header>
+
+  <div class="grid" id="stats"></div>
+
+  <div class="cols">
+    <div class="col wide">
+      <section class="panel">
+        <div class="row between"><h2>Today's quests</h2><span class="xp" id="q-count"></span></div>
+        <form class="row" data-form="quest">
+          <input type="text" id="q-title" placeholder="New quest" aria-label="New quest" maxlength="80">
+          <select id="q-due" aria-label="Due in"><option value="">No due time</option><option value="10">Due in 10 min</option><option value="30">Due in 30 min</option><option value="60">Due in 1 hour</option><option value="120">Due in 2 hours</option><option value="240">Due in 4 hours</option></select>
+          <select id="q-target" aria-label="Counts toward"></select>
+          <button class="primary">Add</button>
+        </form>
+        <div id="quests"></div>
+        <div class="verdict" id="verdict" hidden></div>
+      </section>
+      <section class="panel">
+        <h2>Boss targets</h2>
+        <form class="field" data-form="target">
+          <label for="t-prompt">Describe a target and when you want it</label>
+          <textarea id="t-prompt" placeholder="Example: I want to buy a new laptop in 4 months"></textarea>
+          <div class="row"><button class="primary">Plan this target</button><span class="muted small">Simulated planner. The real app asks the LLM.</span></div>
+        </form>
+        <div id="t-preview" hidden></div>
+        <div id="targets"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel solid">
+        <h2>! Quick notes</h2>
+        <form class="row" data-form="note">
+          <input type="text" id="n-title" placeholder="Urgent note" aria-label="Urgent note" maxlength="100">
+          <select id="n-due" aria-label="Due in"><option value="">No due time</option><option value="10">10 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="120">2 hours</option></select>
+          <button>Add</button>
+        </form>
+        <div id="notes"></div>
+      </section>
+      <section class="panel">
+        <h2>Side quests · no timer</h2>
+        <form class="row" data-form="side">
+          <input type="text" id="s-title" placeholder="Something to remember" aria-label="New side quest" maxlength="80">
+          <button>Add</button>
+        </form>
+        <div id="sides"></div>
+      </section>
+      <section class="panel">
+        <h2>Prototype controls</h2>
+        <p class="muted small">For review only. These will not exist in the real app.</p>
+        <label class="row" style="letter-spacing:1px"><input type="checkbox" id="sim-on"> Simulate a deadline closing in</label>
+        <input type="range" id="sim-u" min="0" max="100" value="0" aria-label="Urgency" style="width:100%">
+        <label class="row" style="letter-spacing:1px"><input type="checkbox" id="sim-stag"> Simulate boss-target stagnation</label>
+        <div class="row"><button data-act="clear-examples">Clear examples</button><button data-act="reset">Reset prototype</button></div>
+      </section>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+/* ---------- constants ---------- */
+var WINDOW_MS = 2 * 60 * 60 * 1000;      // warning window before a due time
+var STAGNATION_MS = 3 * 24 * 60 * 60 * 1000;
+var LEVEL_XP = 500;
+var STORE = 'the-system-prototype-v1';
+var AVATARS = [
+  ['visor','Visor','<path d="M14 30c0-12 8-20 18-20s18 8 18 20v14l-8 10H22l-8-10z"/><path d="M20 30h24v8H20z"/>'],
+  ['prism','Prism','<path d="M32 8 56 52H8z"/><path d="M32 8v44M20 30l12 22 12-22"/>'],
+  ['orbit','Orbit','<circle cx="32" cy="32" r="12"/><ellipse cx="32" cy="32" rx="26" ry="9" transform="rotate(-24 32 32)"/>'],
+  ['bolt','Bolt','<path d="M36 6 14 36h14l-4 22 26-32H34z"/>'],
+  ['crown','Crown','<path d="M8 46 12 18l12 14 8-20 8 20 12-14 4 28z"/><path d="M8 54h48"/>'],
+  ['eye','Eye','<path d="M4 32c8-12 18-18 28-18s20 6 28 18c-8 12-18 18-28 18S12 44 4 32z"/><circle cx="32" cy="32" r="8"/>'],
+  ['core','Core','<path d="M32 6 54 19v26L32 58 10 45V19z"/><path d="M32 20 43 26v12l-11 6-11-6V26z"/>'],
+  ['blade','Blade','<path d="M32 4 40 40 32 48 24 40z"/><path d="M18 40h28M32 48v12"/>']
+];
+var GUIDES = {
+  gemini: ['Open Google AI Studio and sign in.', 'Choose the option to create an API key.', 'Copy the key and paste it here.'],
+  claude: ['Open the Claude Console and sign in.', 'Add billing credit, then create an API key.', 'Copy the key and paste it here.'],
+  openai: ['Open the OpenAI developer platform and sign in.', 'Add billing credit, then create an API key.', 'Copy the key and paste it here.']
+};
+var KEYWORDS = {
+  money: ['invoice','client','pay','earn','freelanc','budget','save','invest','salary','sell','money'],
+  knowledge: ['read','study','learn','course','code','pull request','practice','write','build','ship','dsa','prep'],
+  health: ['workout','gym','run','walk','sleep','meditat','water','stretch','yoga','sport','fit'],
+  discipline: ['clean','wake','plan','journal','organi','routine','renew','call'],
+  relationships: ['family','friend','relationship','parents'],
+  creativity: ['creative','music','art','design','draw'],
+  career: ['career','job','promotion','placement','interview']
+};
+
+/* ---------- pure logic (kept free of the DOM so it can be tested) ---------- */
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+function hueFor(u) { return u <= 0.5 ? 258 + (305 - 258) * (u / 0.5) : 305 + (385 - 305) * ((u - 0.5) / 0.5); }
+function urgencyOf(tasks, now) {
+  var best = { u: 0, task: null };
+  tasks.forEach(function (t) {
+    if (t.done || !t.dueAt) return;
+    var u = clamp(1 - (t.dueAt - now) / WINDOW_MS, 0, 1);
+    if (u > best.u) best = { u: u, task: t };
+  });
+  return best;
+}
+function hasWord(text, words) { text = text.toLowerCase(); return words.some(function (w) { return text.indexOf(w) !== -1; }); }
+function buildRubric(goals) {
+  var names = ['Money', 'Knowledge', 'Health', 'Discipline'];
+  ['Relationships', 'Creativity', 'Career'].forEach(function (n) { if (hasWord(goals, KEYWORDS[n.toLowerCase()])) names.push(n); });
+  return names.map(function (n) {
+    var boosted = hasWord(goals, KEYWORDS[n.toLowerCase()]);
+    return { name: n, xp: boosted ? 50 : 30, note: boosted ? 'Weighted higher because your goals mention it' : 'Standard weight' };
+  });
+}
+function judge(task, rubric, now) {
+  if (!rubric.length) return null;
+  var rule = null;
+  rubric.forEach(function (r) {
+    var words = (KEYWORDS[r.name.toLowerCase()] || []).concat([r.name.toLowerCase()]);
+    if (!rule && hasWord(task.title, words)) rule = r;
+  });
+  var matched = !!rule;
+  if (!rule) rule = rubric.filter(function (r) { return r.name.toLowerCase() === 'discipline'; })[0] || rubric[0];
+  var early = task.dueAt && now <= task.dueAt;
+  var amount = Math.round(rule.xp * (early ? 1.5 : 1));
+  var why = (matched ? 'It matches your ' + rule.name + ' rule.' : 'No rule matched, so it counts as ' + rule.name + '.') + (early ? ' Bonus for beating the due time.' : '');
+  return { param: rule.name, amount: amount, reason: why };
+}
+function parseTarget(text, now) {
+  var m = text.match(/(\d+)\s*(day|week|month|year)s?/i);
+  var days = 0;
+  if (m) days = parseInt(m[1], 10) * { day: 1, week: 7, month: 30, year: 365 }[m[2].toLowerCase()];
+  var title = text.replace(/\b(in|within|over the next)\s+\d+\s*(day|week|month|year)s?\b/i, '').replace(/^\s*i\s+(want|would like|need)\s+to\s+/i, '').replace(/[\s.,]+$/, '').trim();
+  if (title) title = title.charAt(0).toUpperCase() + title.slice(1);
+  var target = { title: title, cost: days ? clamp(Math.round(days * 40 / 100) * 100, 500, 50000) : 2000, createdAt: now, deadline: days ? now + days * 86400000 : null, milestones: [] };
+  if (days) [0.25, 0.5, 0.75, 1].forEach(function (f) { target.milestones.push({ at: now + days * 86400000 * f, share: f }); });
+  return target;
+}
+function isStagnant(targets, now) {
+  var open = targets.filter(function (t) { return !t.claimed; });
+  if (!open.length) return false;
+  var last = Math.max.apply(null, open.map(function (t) { return t.lastXpAt || t.createdAt; }));
+  return now - last > STAGNATION_MS;
+}
+</script>
+<script>
+/* ---------- state ---------- */
+var state = { step: 0, onboarded: false, player: { name: '', purpose: '', avatar: 'visor', provider: 'gemini' }, goals: '', rubric: [], tasks: [], targets: [], events: [], verdict: '', stagnantDismissed: false, sim: { on: false, u: 0, stag: false }, draftTarget: null, returnToDash: false };
+var hue = 258, uid = 1;
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+function load() { try { var s = JSON.parse(localStorage.getItem(STORE)); if (s && s.player) { state = s; state.draftTarget = null; state.tasks.concat(state.targets).forEach(function (x) { uid = Math.max(uid, x.id + 1); }); } } catch (e) {} }
+function fmtDate(ms) { return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+function fmtLeft(ms) {
+  if (ms <= 0) return 'OVERDUE';
+  var s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h ? h + 'h ' + m + 'm' : m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+function avatarSvg(id) {
+  var a = AVATARS.filter(function (x) { return x[0] === id; })[0] || AVATARS[0];
+  return '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">' + a[2] + '</svg>';
+}
+function totalXp() { return state.events.reduce(function (s, e) { return s + e.amount; }, 0); }
+
+/* ---------- onboarding ---------- */
+function showStep() {
+  document.querySelectorAll('[data-step]').forEach(function (el) { el.hidden = Number(el.dataset.step) !== state.step; });
+  $('onb').hidden = state.onboarded; $('dash').hidden = !state.onboarded;
+}
+function fillOnboarding() {
+  $('f-name').value = state.player.name; $('f-purpose').value = state.player.purpose; $('f-provider').value = state.player.provider; $('f-goals').value = state.goals;
+  renderAvatars(); renderGuide(); renderRubric();
+}
+function renderAvatars() {
+  $('avatars').innerHTML = AVATARS.map(function (a) {
+    return '<button type="button" data-act="avatar" data-id="' + a[0] + '" aria-pressed="' + (state.player.avatar === a[0]) + '">' + avatarSvg(a[0]) + a[1] + '</button>';
+  }).join('');
+}
+function renderGuide() { $('guide').innerHTML = GUIDES[$('f-provider').value].map(function (s) { return '<li>' + s + '</li>'; }).join(''); }
+function renderRubric() {
+  $('rubric').innerHTML = state.rubric.length ? state.rubric.map(function (r, i) {
+    return '<div class="rule"><input type="text" id="r-name-' + i + '" data-rule="' + i + '" data-key="name" value="' + esc(r.name) + '" aria-label="Parameter name">' +
+      '<input type="number" id="r-xp-' + i + '" data-rule="' + i + '" data-key="xp" value="' + r.xp + '" min="0" step="5" aria-label="XP per task"><span class="small muted">XP per task</span>' +
+      '<button type="button" class="ghost" data-act="del-rule" data-i="' + i + '">Remove</button><span class="small muted" style="flex-basis:100%">' + esc(r.note || '') + '</span></div>';
+  }).join('') : '<p class="empty">No rules yet. Describe your goals and generate them, or add parameters by hand.</p>';
+}
+function readOnboarding() {
+  state.player.name = $('f-name').value.trim(); state.player.purpose = $('f-purpose').value.trim(); state.player.provider = $('f-provider').value; state.goals = $('f-goals').value.trim();
+}
+
+/* ---------- dashboard ---------- */
+function seedExamples() {
+  var now = Date.now();
+  state.tasks = [
+    { id: uid++, kind: 'today', title: 'Morning workout', example: true },
+    { id: uid++, kind: 'today', title: 'Ship the pending pull request', example: true },
+    { id: uid++, kind: 'side', title: 'Renew the passport', example: true },
+    { id: uid++, kind: 'note', title: 'Form closes tonight', example: true }
+  ];
+  var t = parseTarget('Buy a new laptop in 4 months', now); t.id = uid++; t.progress = 0; t.example = true; state.targets = [t];
+}
+function taskRow(t) {
+  var due = t.dueAt && !t.done ? '<span class="chip' + (t.dueAt - Date.now() < WINDOW_MS ? ' hot' : '') + '" data-due="' + t.dueAt + '">' + fmtLeft(t.dueAt - Date.now()) + '</span>' : '';
+  var tg = state.targets.filter(function (x) { return x.id === t.targetId; })[0];
+  return '<div class="item' + (t.done ? ' done' : '') + '"><button type="button" class="tick" data-act="complete" data-id="' + t.id + '" aria-label="' + (t.done ? 'Completed: ' : 'Complete: ') + esc(t.title) + '"' + (t.done ? ' disabled' : '') + '>' + (t.done ? '✓' : '') + '</button>' +
+    '<span class="t">' + esc(t.title) + '</span>' + (t.example ? '<span class="chip">Example</span>' : '') + (tg ? '<span class="chip">' + esc(tg.title) + '</span>' : '') + due +
+    (t.award ? '<span class="xp">+' + t.award + '</span>' : '') +
+    (t.kind === 'side' && !t.done ? '<button type="button" class="ghost" data-act="promote" data-id="' + t.id + '">To today</button>' : '') +
+    '<button type="button" class="ghost" data-act="remove" data-id="' + t.id + '" aria-label="Delete ' + esc(t.title) + '">✕</button></div>';
+}
+function listOf(kind, emptyText) {
+  var rows = state.tasks.filter(function (t) { return t.kind === kind; });
+  return rows.length ? rows.map(taskRow).join('') : '<p class="empty">' + emptyText + '</p>';
+}
+function targetCard(t, preview) {
+  var now = Date.now(), pct = clamp(Math.round((t.progress || 0) / t.cost * 100), 0, 100), html = '';
+  html += '<div style="display:flex;flex-direction:column;gap:8px;padding:12px 0;border-bottom:1px dashed var(--line)">';
+  html += '<div class="row between"><strong>' + esc(t.title) + '</strong><span class="row">' + (t.example ? '<span class="chip">Example</span>' : '') + '<span class="xp">' + (t.claimed ? 'CLAIMED' : pct + '%') + '</span></span></div>';
+  html += '<div class="bar"><i style="width:' + pct + '%"></i></div>';
+  html += '<div class="small muted">' + (t.progress || 0) + ' / ' + t.cost + ' XP' + (t.deadline ? ' · due ' + fmtDate(t.deadline) + ' · ' + Math.max(0, Math.ceil((t.deadline - now) / 86400000)) + ' days left' : ' · no deadline') + '</div>';
+  if (t.deadline) {
+    var span = t.deadline - t.createdAt, at = clamp((now - t.createdAt) / span * 100, 0, 100);
+    html += '<div class="timeline" role="img" aria-label="Timeline with ' + t.milestones.length + ' checkpoints">' + t.milestones.map(function (m) {
+      return '<span class="' + ((t.progress || 0) >= t.cost * m.share ? 'hit' : '') + '" style="left:' + (m.share * 100) + '%" title="' + Math.round(m.share * 100) + '% by ' + fmtDate(m.at) + '"></span>';
+    }).join('') + '<b style="left:' + at + '%" title="Today"></b></div>';
+    html += '<div class="small muted">Checkpoints: ' + t.milestones.map(function (m) { return Math.round(m.share * 100) + '% by ' + fmtDate(m.at); }).join(' · ') + '</div>';
+  }
+  if (preview) html += '<div class="row"><button type="button" class="primary" data-act="save-target">Save target</button><button type="button" data-act="discard-target">Discard</button></div>';
+  else html += '<div class="row">' + (pct >= 100 && !t.claimed ? '<button type="button" class="primary" data-act="claim" data-id="' + t.id + '">Claim</button>' : '') + '<button type="button" class="ghost" data-act="del-target" data-id="' + t.id + '">Delete</button></div>';
+  return html + '</div>';
+}
+function renderDash() {
+  var total = totalXp(), level = Math.floor(total / LEVEL_XP) + 1, lv = 'LEVEL ' + (level < 10 ? '0' : '') + level;
+  $('d-avatar').innerHTML = avatarSvg(state.player.avatar);
+  $('d-level').textContent = lv; $('d-level').setAttribute('data-text', lv);
+  $('d-name').textContent = state.player.name || 'Player'; $('d-purpose').textContent = state.player.purpose ? '· ' + state.player.purpose : '';
+  $('d-total').textContent = total.toLocaleString() + ' XP';
+  $('d-next').textContent = (LEVEL_XP - total % LEVEL_XP) + ' XP to level ' + (level + 1);
+  var sums = {}; state.events.forEach(function (e) { sums[e.param] = (sums[e.param] || 0) + e.amount; });
+  var top = Math.max(200, Math.max.apply(null, state.rubric.map(function (r) { return sums[r.name] || 0; }).concat([0])));
+  $('stats').innerHTML = state.rubric.map(function (r) {
+    var v = sums[r.name] || 0;
+    return '<div class="panel" style="padding:14px;gap:8px"><div class="row between"><strong style="letter-spacing:2px;text-transform:uppercase">' + esc(r.name) + '</strong><span class="stat-num">' + v + '</span></div><div class="bar"><i style="width:' + Math.round(v / top * 100) + '%"></i></div></div>';
+  }).join('');
+  var today = state.tasks.filter(function (t) { return t.kind === 'today'; });
+  $('q-count').textContent = today.filter(function (t) { return t.done; }).length + ' / ' + today.length;
+  $('quests').innerHTML = listOf('today', 'No quests yet. Add what you need to finish today.');
+  $('notes').innerHTML = listOf('note', 'Nothing urgent right now.');
+  $('sides').innerHTML = listOf('side', 'Nothing parked here yet.');
+  $('q-target').innerHTML = '<option value="">No boss target</option>' + state.targets.filter(function (t) { return !t.claimed; }).map(function (t) { return '<option value="' + t.id + '">Counts toward: ' + esc(t.title) + '</option>'; }).join('');
+  $('targets').innerHTML = state.targets.length ? state.targets.map(function (t) { return targetCard(t, false); }).join('') : '<p class="empty">No boss targets yet. Describe one above.</p>';
+  $('t-preview').hidden = !state.draftTarget; if (state.draftTarget) $('t-preview').innerHTML = targetCard(state.draftTarget, true);
+  $('verdict').hidden = !state.verdict; $('verdict').textContent = state.verdict;
+  $('sim-on').checked = state.sim.on; $('sim-u').value = state.sim.u; $('sim-stag').checked = state.sim.stag;
+  renderTicker(); tick();
+}
+function renderTicker() {
+  var items = state.events.slice(-5).reverse().map(function (e) { return '+' + e.amount + ' ' + e.param + ' XP · ' + e.title; });
+  if (!items.length) items = ['The System online', 'Clear a quest to earn XP', 'Judge standing by'];
+  while (items.length < 5) items = items.concat(items);
+  var row = items.map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('');
+  $('ticker').innerHTML = row + row;
+}
+
+/* ---------- live theme: urgency drives hue and speed ---------- */
+function tick() {
+  var now = Date.now(), live = urgencyOf(state.tasks, now), u = state.sim.on ? state.sim.u / 100 : live.u;
+  var stagnant = state.sim.stag || isStagnant(state.targets, now);
+  var target = stagnant && u < 0.6 ? 405 : hueFor(u);          // 405 is an orange-red, kept apart from deadline red
+  hue += (target - hue) * 0.12;
+  var root = document.documentElement.style;
+  root.setProperty('--h', hue.toFixed(1));
+  root.setProperty('--spd', (1 - 0.65 * u).toFixed(2));
+  document.body.classList.toggle('frantic', u >= 0.75);
+  if (!state.onboarded) return;
+  $('urgent').hidden = !(u > 0);
+  if (u > 0) {
+    var t = state.sim.on ? null : live.task;
+    $('urgent-text').textContent = t ? 'Deadline closing in: ' + t.title : 'Simulated deadline closing in';
+    $('urgent-count').textContent = t ? fmtLeft(t.dueAt - now) : Math.round(u * 100) + '%';
+  }
+  $('stagnant').hidden = !stagnant || state.stagnantDismissed;
+  $('d-state').textContent = u >= 0.75 ? 'Critical' : u > 0 ? 'Deadline near' : stagnant ? 'Targets stalled' : 'All clear';
+  document.querySelectorAll('[data-due]').forEach(function (el) { el.textContent = fmtLeft(Number(el.dataset.due) - now); });
+}
+
+/* ---------- actions ---------- */
+function addTask(kind, title, dueMin, targetId) {
+  if (!title) return;
+  state.tasks.push({ id: uid++, kind: kind, title: title, dueAt: dueMin ? Date.now() + dueMin * 60000 : null, targetId: targetId || null });
+}
+function complete(id) {
+  var t = state.tasks.filter(function (x) { return x.id === id; })[0]; if (!t || t.done) return;
+  var now = Date.now(), v = judge(t, state.rubric, now);
+  t.done = true;
+  if (!v) { state.verdict = 'Quest cleared. Add XP rules to start earning XP.'; return; }
+  t.award = v.amount;
+  state.events.push({ title: t.title, param: v.param, amount: v.amount, at: now });
+  var tg = state.targets.filter(function (x) { return x.id === t.targetId && !x.claimed; })[0];
+  if (tg) { tg.progress = (tg.progress || 0) + v.amount; tg.lastXpAt = now; state.stagnantDismissed = false; state.sim.stag = false; }
+  state.verdict = 'Judge (simulated): "' + t.title + '" cleared. +' + v.amount + ' ' + v.param + ' XP. ' + v.reason + (tg ? ' Counted toward ' + tg.title + '.' : '');
+}
+document.addEventListener('click', function (ev) {
+  var b = ev.target.closest('[data-act]'); if (!b) return;
+  var act = b.dataset.act, id = Number(b.dataset.id);
+  if (act === 'next') {
+    readOnboarding();
+    if (state.step === 1 && !state.player.name) { $('e-name').hidden = false; $('f-name').focus(); return; }
+    $('e-name').hidden = true; state.step++; showStep();
+  } else if (act === 'back') { readOnboarding(); state.step = Math.max(0, state.step - 1); showStep(); }
+  else if (act === 'avatar') { state.player.avatar = b.dataset.id; renderAvatars(); }
+  else if (act === 'gen-rubric') { readOnboarding(); state.rubric = buildRubric(state.goals); renderRubric(); }
+  else if (act === 'add-rule') { state.rubric.push({ name: 'New parameter', xp: 30, note: 'Added by you' }); renderRubric(); }
+  else if (act === 'del-rule') { state.rubric.splice(Number(b.dataset.i), 1); renderRubric(); }
+  else if (act === 'finish') {
+    readOnboarding(); if (!state.rubric.length) state.rubric = buildRubric(state.goals);
+    if (!state.onboarded && !state.returnToDash) seedExamples();
+    state.onboarded = true; state.returnToDash = false; showStep(); renderDash(); window.scrollTo(0, 0);
+  }
+  else if (act === 'edit-player') { state.onboarded = false; state.returnToDash = true; state.step = 1; fillOnboarding(); showStep(); }
+  else if (act === 'edit-rules') { state.onboarded = false; state.returnToDash = true; state.step = 5; fillOnboarding(); showStep(); }
+  else if (act === 'complete') { complete(id); renderDash(); }
+  else if (act === 'remove') { state.tasks = state.tasks.filter(function (t) { return t.id !== id; }); renderDash(); }
+  else if (act === 'promote') { state.tasks.forEach(function (t) { if (t.id === id) t.kind = 'today'; }); renderDash(); }
+  else if (act === 'save-target') { var d = state.draftTarget; d.id = uid++; d.progress = 0; state.targets.push(d); state.draftTarget = null; $('t-prompt').value = ''; renderDash(); }
+  else if (act === 'discard-target') { state.draftTarget = null; renderDash(); }
+  else if (act === 'del-target') { state.targets = state.targets.filter(function (t) { return t.id !== id; }); renderDash(); }
+  else if (act === 'claim') { state.targets.forEach(function (t) { if (t.id === id) t.claimed = true; }); state.verdict = 'Boss target claimed. Go enjoy it.'; renderDash(); }
+  else if (act === 'dismiss-stagnant') { state.stagnantDismissed = true; tick(); }
+  else if (act === 'clear-examples') { state.tasks = state.tasks.filter(function (t) { return !t.example; }); state.targets = state.targets.filter(function (t) { return !t.example; }); renderDash(); }
+  else if (act === 'reset') { try { localStorage.removeItem(STORE); } catch (e) {} location.reload(); return; }
+  save();
+});
+document.addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  var f = ev.target.dataset.form;
+  if (f === 'quest') { addTask('today', $('q-title').value.trim(), Number($('q-due').value), Number($('q-target').value)); $('q-title').value = ''; }
+  if (f === 'note') { addTask('note', $('n-title').value.trim(), Number($('n-due').value)); $('n-title').value = ''; }
+  if (f === 'side') { addTask('side', $('s-title').value.trim()); $('s-title').value = ''; }
+  if (f === 'target') { var text = $('t-prompt').value.trim(); if (text) { var d = parseTarget(text, Date.now()); if (d.title) state.draftTarget = d; } }
+  renderDash(); save();
+});
+document.addEventListener('input', function (ev) {
+  var el = ev.target;
+  if (el.dataset.rule) { var r = state.rubric[Number(el.dataset.rule)]; if (r) r[el.dataset.key] = el.dataset.key === 'xp' ? Math.max(0, Number(el.value) || 0) : el.value; save(); }
+  if (el.id === 'f-provider') renderGuide();
+  if (el.id === 'sim-on') { state.sim.on = el.checked; if (el.checked && state.sim.u === 0) { state.sim.u = 50; $('sim-u').value = 50; } tick(); save(); }
+  if (el.id === 'sim-u') { state.sim.u = Number(el.value); state.sim.on = true; $('sim-on').checked = true; tick(); }
+  if (el.id === 'sim-stag') { state.sim.stag = el.checked; if (el.checked) state.stagnantDismissed = false; tick(); save(); }
+});
+
+/* ---------- start ---------- */
+load(); fillOnboarding(); showStep(); renderTicker();
+if (state.onboarded) renderDash();
+setInterval(tick, 250);
+</script>
+</body>
+</html>
