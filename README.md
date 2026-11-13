@@ -1,27 +1,53 @@
 # The System
 
-A gamified daily work tracker. Clear quests, earn XP from an LLM judge, and spend it on the life targets you care about.
+A gamified daily work tracker. Clear quests, earn XP from an AI judge, and spend it on the life targets you care about.
+
+Built with Next.js and MongoDB. Each player brings their own LLM API key.
 
 ## Status
 
-Front-end prototype only. There is no backend, no login and no real LLM call yet. The judge and the boss-target planner are simulated in the browser so the look and flow can be reviewed.
+| Phase | Scope | State |
+|---|---|---|
+| 1 | Foundation: project, theme, app shell, database helper | Done |
+| 2 | Accounts | Next |
+| 3 | Onboarding | Planned |
+| 4–10 | Quests, XP, judge, levels, boss targets, urgency, polish | Planned |
 
-## Run the prototype
+## Run it locally
+
+Requires Node.js 20.9 or later.
 
 ```bash
-npx serve prototype
+npm install
+cp .env.example .env.local   # fill in values when a phase needs them
+npm run dev
 ```
 
-Then open the address it prints (usually http://localhost:3000). You can also open `prototype/index.html` directly in a browser.
+Open http://localhost:3000.
 
-## What the prototype shows
+- `/` shows the themed shell and a system check.
+- `/api/health` returns the app and database status as JSON.
 
-- Onboarding: player name, purpose, avatar, API key step, XP rules
-- Dashboard: today's quests, side quests, quick notes, boss targets with a timeline
-- Urgency theme: dark blue by default, shifting through purple to red as a due time approaches
-- Stagnation alert: orange-red tint when no XP has gone toward a boss target for a while
-- Prototype controls: sliders to preview the urgency and stagnation states
+## Environment variables
 
-## Planned stack
+See `.env.example`. Values go in `.env.local`, which git ignores.
 
-Next.js and MongoDB, with each player bringing their own LLM API key.
+| Variable | Needed from | Purpose |
+|---|---|---|
+| `MONGODB_URI` | Phase 2 | MongoDB Atlas connection string |
+| `AUTH_SECRET` | Phase 2 | Signs login sessions |
+
+## Project layout
+
+```
+src/
+  app/            routes and API handlers
+  components/     arcade UI components
+  theme/          design tokens: hue, fonts, motion timings
+  lib/db/         MongoDB connection
+prototype/        approved front-end prototype (reference only)
+```
+
+## Theme
+
+Every accent colour comes from one hue, `BASE_HUE` in `src/theme/tokens.js`. Change it and the whole app recolours. Motion timings live in the same file.

@@ -7,3 +7,8 @@ dist/
 !.env.example
 .DS_Store
 *.log
+next-env.d.ts
+
+# Planning notes stay local; they are not part of the repo
+docs/
+IMPLEMENTATION_PLAN.md
