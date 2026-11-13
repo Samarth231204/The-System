@@ -25,7 +25,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Ticker items={[`Player ${player.playerName} online`, `Class: ${avatar.name}`, 'Quests arrive in Phase 4']} />
+      <Ticker items={[`Player ${player.playerName} online`, `Class: ${avatar.name}`, 'Quest log online']} />
       <main className="sys-main">
         <header style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div className="sys-eyebrow">Player one // online</div>
@@ -43,6 +43,7 @@ export default async function DashboardPage() {
           {player.purpose && <p>{player.purpose}</p>}
           <p className="sys-small sys-muted">Signed in as {user.email}</p>
           <div className="sys-row">
+            <Button href="/quests">Quest log</Button>
             <Button href="/profile" variant="ghost">Edit profile</Button>
             <LogoutButton />
           </div>
