@@ -9,7 +9,7 @@ Built with Next.js and MongoDB. Each player brings their own LLM API key.
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Foundation: project, theme, app shell, database helper | Done |
-| 2 | Accounts | Next |
+| 2 | Accounts: sign up, log in, log out, protected routes | Done |
 | 3 | Onboarding | Planned |
 | 4–10 | Quests, XP, judge, levels, boss targets, urgency, polish | Planned |
 
@@ -25,7 +25,8 @@ npm run dev
 
 Open http://localhost:3000.
 
-- `/` shows the themed shell and a system check.
+- `/` sends you to the dashboard, or to login if you are logged out.
+- `/signup` creates an account; `/login` signs in; `/dashboard` is protected.
 - `/api/health` returns the app and database status as JSON.
 
 ## Environment variables
