@@ -51,6 +51,14 @@ export function parseProfileUpdate(body) {
     if (goals.length > 1000) return { error: 'Goals must be 1000 characters or fewer.' };
     out.goals = goals;
   }
+  if ('warningHours' in body || 'stagnationDays' in body) {
+    const warningHours = Number(body.warningHours ?? 2);
+    const stagnationDays = Number(body.stagnationDays ?? 3);
+    if (!Number.isInteger(warningHours) || warningHours < 1 || warningHours > 48) return { error: 'Warning window must be 1 to 48 hours.' };
+    if (!Number.isInteger(stagnationDays) || stagnationDays < 1 || stagnationDays > 30) return { error: 'Stagnation window must be 1 to 30 days.' };
+    out['settings.warningHours'] = warningHours;
+    out['settings.stagnationDays'] = stagnationDays;
+  }
   if (body.onboarded === true) out.onboardedAt = new Date();
   if (body.onboarded === false) out.onboardedAt = null;
   return { value: out };

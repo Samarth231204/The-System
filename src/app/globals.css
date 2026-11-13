@@ -217,3 +217,16 @@ a:hover { color: #fff; }
 @media (prefers-reduced-motion: reduce) {
   .sys-onb-panel, .sys-avatar-card { animation: none !important; }
 }
+
+/* ---------- Phase 9: urgency banners and alerts ---------- */
+.sys-banner {
+  position: sticky; top: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin: 0 0 12px; padding: 12px 18px; background: var(--deep); color: #fff;
+  border: 1px solid var(--accent); box-shadow: 0 0 22px var(--fill);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.sys-banner--overdue { animation: sys-banner-pulse 0.9s steps(2, start) infinite; }
+.sys-banner--warning { animation: sys-banner-pulse 1.6s ease-in-out infinite; }
+.sys-banner--stagnation { border-color: oklch(0.7 0.2 var(--h)); }
+@keyframes sys-banner-pulse { 50% { box-shadow: 0 0 34px var(--accent); } }
+@media (prefers-reduced-motion: reduce) { .sys-banner--overdue, .sys-banner--warning { animation: none; } }

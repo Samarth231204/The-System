@@ -18,6 +18,7 @@ export default function ProfileForm({ initial }) {
   const [error, setError] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [keyInput, setKeyInput] = useState('');
+  const [timing, setTiming] = useState({ warningHours: initial.settings?.warningHours ?? 2, stagnationDays: initial.settings?.stagnationDays ?? 3 });
 
   useEffect(() => {
     try {
@@ -99,6 +100,21 @@ export default function ProfileForm({ initial }) {
         <p className="sys-small sys-muted">Changing goals does not change XP criteria yet. Criteria are set in Phase 5.</p>
         <div className="sys-row">
           <button type="button" className="sys-btn sys-btn--primary" onClick={() => save({ goals: form.goals })}>Save goals</button>
+        </div>
+      </Panel>
+
+      <Panel>
+        <h2 className="sys-h2">Alert timing</h2>
+        <div className="sys-row" style={{ alignItems: 'flex-end' }}>
+          <div className="sys-field" style={{ width: 180 }}>
+            <label className="sys-label" htmlFor="p-warn">Deadline warning (hours)</label>
+            <input id="p-warn" className="sys-input" type="number" min={1} max={48} value={timing.warningHours} onChange={(e) => setTiming((t) => ({ ...t, warningHours: e.target.value }))} />
+          </div>
+          <div className="sys-field" style={{ width: 180 }}>
+            <label className="sys-label" htmlFor="p-stall">Stagnation after (days)</label>
+            <input id="p-stall" className="sys-input" type="number" min={1} max={30} value={timing.stagnationDays} onChange={(e) => setTiming((t) => ({ ...t, stagnationDays: e.target.value }))} />
+          </div>
+          <button type="button" className="sys-btn sys-btn--primary" onClick={() => save({ warningHours: Number(timing.warningHours), stagnationDays: Number(timing.stagnationDays) })}>Save timing</button>
         </div>
       </Panel>
 
