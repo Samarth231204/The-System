@@ -9,6 +9,7 @@ import AvatarArt from '@/components/avatars/AvatarArt';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { getPlayer, toPlayerDto } from '@/lib/player/service';
 import { findAvatar } from '@/lib/avatars';
+import { computeStats } from '@/lib/stats/service';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dashboard · The System' };
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
   if (!player?.onboarded) redirect('/onboarding');
 
   const avatar = findAvatar(player.avatarId);
+  const stats = await computeStats(user.id);
 
   return (
     <>
@@ -38,6 +40,8 @@ export default async function DashboardPage() {
             <div>
               <h2 className="sys-h2">{player.playerName}</h2>
               <div className="sys-small sys-muted">{avatar.title}</div>
+              <Link href="/stats" className="sys-xp">Level {stats.level} · {stats.title}</Link>
+              <div className="sys-small"><Link href="/stats">{stats.totalXp} XP</Link></div>
             </div>
           </div>
           {player.purpose && <p>{player.purpose}</p>}
